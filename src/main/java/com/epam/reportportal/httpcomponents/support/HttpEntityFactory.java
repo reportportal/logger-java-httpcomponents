@@ -146,6 +146,7 @@ public class HttpEntityFactory {
 	}
 
 	@Nonnull
+	@SuppressWarnings("unused")
 	public static HttpFormatter createHttpResponseFormatter(@Nonnull HttpResponse response,
 			@Nonnull HttpContext context, @Nullable Function<Header, String> headerConverter,
 			@Nullable Function<Cookie, String> cookieConverter,
