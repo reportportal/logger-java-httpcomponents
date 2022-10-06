@@ -16,9 +16,7 @@
 
 package com.epam.reportportal.httpcomponents.support;
 
-import com.epam.reportportal.formatting.http.HttpFormatter;
-import com.epam.reportportal.formatting.http.HttpRequestFormatter;
-import com.epam.reportportal.formatting.http.HttpResponseFormatter;
+import com.epam.reportportal.formatting.http.*;
 import com.epam.reportportal.formatting.http.entities.BodyType;
 import com.epam.reportportal.formatting.http.entities.Cookie;
 import com.epam.reportportal.formatting.http.entities.Header;
@@ -28,6 +26,7 @@ import com.epam.reportportal.service.ReportPortal;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.*;
+import org.apache.http.entity.BufferedHttpEntity;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
 
@@ -35,13 +34,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.epam.reportportal.formatting.http.HttpFormatUtils.*;
 import static java.util.Optional.ofNullable;
@@ -80,24 +77,72 @@ public class HttpEntityFactory {
 		return toString(httpEntity, charset);
 	}
 
-	@Nullable
+	@Nonnull
 	private static List<Param> toParams(@Nonnull HttpEntity httpEntity) {
-		Charset charset = getCharset(httpEntity);
 		String body = toString(httpEntity, StandardCharsets.ISO_8859_1);
+		return HttpFormatUtils.toForm(body,
+				ofNullable(httpEntity.getContentType()).map(NameValuePair::getValue).orElse(null)
+		);
+	}
 
-		return ofNullable(body).map(b -> b.split("&")).map(elements -> Arrays.stream(elements).map(element -> {
-			String[] param = element.split("=", 2);
-			try {
-				if (param.length > 1) {
-					return new Param(URLDecoder.decode(param[0], charset.name()),
-							URLDecoder.decode(param[1], charset.name())
-					);
-				}
-				return new Param(URLDecoder.decode(param[0], charset.name()), "");
-			} catch (UnsupportedEncodingException ignore) {
+	@Nullable
+	private static String getBoundary(@Nonnull HttpEntity httpEntity) {
+		return ofNullable(httpEntity.getContentType()).flatMap(h -> toKeyValue(h.getValue()).filter(p -> "boundary".equalsIgnoreCase(
+				p.getKey())).findAny()).map(Pair::getValue).orElse(null);
+	}
+
+	public static boolean isMatch(@Nonnull byte[] pattern, @Nonnull byte[] input, int pos) {
+		for (int i = 0; i < pattern.length; i++) {
+			if (pattern[i] != input[pos + i]) {
+				return false;
 			}
-			return null;
-		}).filter(Objects::nonNull).collect(Collectors.toList())).orElse(Collections.emptyList());
+		}
+		return true;
+	}
+
+	public static List<byte[]> split(byte[] pattern, byte[] input) {
+		List<byte[]> l = new ArrayList<>();
+		int blockStart = 0;
+		for (int i = 0; i < input.length; i++) {
+			if (isMatch(pattern, input, i)) {
+				l.add(Arrays.copyOfRange(input, blockStart, i));
+				blockStart = i + pattern.length;
+				i = blockStart;
+			}
+		}
+		l.add(Arrays.copyOfRange(input, blockStart, input.length));
+		return l;
+	}
+
+	@Nonnull
+	private static List<HttpPartFormatter> toParts(@Nonnull HttpEntity httpEntity) {
+		return ofNullable(getBoundary(httpEntity)).map(boundary -> {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			try {
+				httpEntity.writeTo(baos);
+			} catch (IOException ignore) {
+				// The entity should be already cached at this point
+			}
+			ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
+
+			return Collections.<HttpPartFormatter>emptyList();
+		}).orElse(Collections.emptyList());
+	}
+
+	@Nullable
+	private static HttpEntity cacheEntity(@Nonnull HttpEntity httpEntity) {
+		if (!httpEntity.isRepeatable()) {
+			try {
+				return new BufferedHttpEntity(httpEntity);
+			} catch (IOException e) {
+				ReportPortal.emitLog("Unable to read HTTP entity: " + ExceptionUtils.getStackTrace(e),
+						LogLevel.WARN.name(),
+						Calendar.getInstance().getTime()
+				);
+				return null;
+			}
+		}
+		return httpEntity;
 	}
 
 	@Nonnull
@@ -126,7 +171,7 @@ public class HttpEntityFactory {
 			return builder.build();
 		}
 
-		HttpEntity httpEntity = ((HttpEntityEnclosingRequest) request).getEntity();
+		HttpEntity httpEntity = cacheEntity(((HttpEntityEnclosingRequest) request).getEntity());
 		if (httpEntity == null) {
 			return builder.build();
 		}
@@ -140,7 +185,12 @@ public class HttpEntityFactory {
 				break;
 			case FORM:
 				builder.bodyParams(toParams(httpEntity));
-
+				break;
+			case MULTIPART:
+				toParts(httpEntity).forEach(builder::addBodyPart);
+				break;
+			default:
+				builder.bodyBytes(type, toBytes(httpEntity));
 		}
 		return builder.build();
 	}
@@ -165,7 +215,7 @@ public class HttpEntityFactory {
 				.forEach(h -> builder.addCookie(toCookie(h.getValue()))));
 		builder.headerConverter(headerConverter).cookieConverter(cookieConverter).prettiers(contentPrettiers);
 
-		HttpEntity httpEntity = response.getEntity();
+		HttpEntity httpEntity = cacheEntity(response.getEntity());
 		if (httpEntity == null) {
 			return builder.build();
 		}

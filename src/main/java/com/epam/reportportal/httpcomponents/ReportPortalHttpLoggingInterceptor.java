@@ -29,7 +29,6 @@ import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpResponseInterceptor;
-import org.apache.http.entity.BufferedHttpEntity;
 import org.apache.http.protocol.HttpContext;
 
 import javax.annotation.Nonnull;
@@ -144,14 +143,6 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 	public void process(HttpResponse response, HttpContext context) {
 		if (responseFilters.stream().anyMatch(f -> f.test(response))) {
 			return;
-		}
-		if (!response.getEntity().isRepeatable()) {
-			try {
-				BufferedHttpEntity bufferedEntity = new BufferedHttpEntity(response.getEntity());
-				response.setEntity(bufferedEntity);
-			} catch (Exception ignore) {
-				// will be logged on reading attempt inside HttpEntityFactory class
-			}
 		}
 		emitLog(HttpEntityFactory.createHttpResponseFormatter(response,
 				context,
