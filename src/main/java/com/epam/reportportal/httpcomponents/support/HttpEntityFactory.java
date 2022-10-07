@@ -34,11 +34,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.epam.reportportal.formatting.http.HttpFormatUtils.*;
 import static java.util.Optional.ofNullable;
@@ -46,9 +46,15 @@ import static java.util.Optional.ofNullable;
 public class HttpEntityFactory {
 
 	@Nonnull
+	private static Charset getCharset(@Nullable String contentTypeValue) {
+		return ofNullable(contentTypeValue).flatMap(h -> toKeyValue(h).filter(p -> "charset".equalsIgnoreCase(p.getKey()))
+				.findAny()).map(Pair::getValue).map(Charset::forName).orElse(StandardCharsets.UTF_8);
+	}
+
+	@Nonnull
 	private static Charset getCharset(@Nonnull HttpEntity httpEntity) {
-		return ofNullable(httpEntity.getContentType()).flatMap(h -> toKeyValue(h.getValue()).filter(p -> "charset".equalsIgnoreCase(
-				p.getKey())).findAny()).map(Pair::getValue).map(Charset::forName).orElse(StandardCharsets.UTF_8);
+		return ofNullable(httpEntity.getContentType()).map(h -> getCharset(h.getValue()))
+				.orElse(StandardCharsets.UTF_8);
 	}
 
 	@Nullable
@@ -91,7 +97,7 @@ public class HttpEntityFactory {
 				p.getKey())).findAny()).map(Pair::getValue).orElse(null);
 	}
 
-	public static boolean isMatch(@Nonnull byte[] pattern, @Nonnull byte[] input, int pos) {
+	private static boolean isMatch(@Nonnull byte[] pattern, @Nonnull byte[] input, int pos) {
 		for (int i = 0; i < pattern.length; i++) {
 			if (pattern[i] != input[pos + i]) {
 				return false;
@@ -100,22 +106,32 @@ public class HttpEntityFactory {
 		return true;
 	}
 
-	public static List<byte[]> split(byte[] pattern, byte[] input) {
-		List<byte[]> l = new ArrayList<>();
+	private static List<byte[]> split(byte[] pattern, byte[] input, int limit) {
+		List<byte[]> result = new ArrayList<>();
+		if (limit == 0) {
+			return result;
+		}
 		int blockStart = 0;
+		int matchCount = 0;
 		for (int i = 0; i < input.length; i++) {
 			if (isMatch(pattern, input, i)) {
-				l.add(Arrays.copyOfRange(input, blockStart, i));
+				result.add(Arrays.copyOfRange(input, blockStart, i));
 				blockStart = i + pattern.length;
 				i = blockStart;
+				if (limit > 0) {
+					if (++matchCount >= limit) {
+						break;
+					}
+				}
 			}
 		}
-		l.add(Arrays.copyOfRange(input, blockStart, input.length));
-		return l;
+		result.add(Arrays.copyOfRange(input, blockStart, input.length));
+		return result;
 	}
 
 	@Nonnull
-	private static List<HttpPartFormatter> toParts(@Nonnull HttpEntity httpEntity) {
+	private static List<HttpPartFormatter> toParts(@Nonnull HttpEntity httpEntity,
+			@Nonnull Map<String, BodyType> bodyTypeMap, @Nullable Function<Header, String> partHeaderConverter) {
 		return ofNullable(getBoundary(httpEntity)).map(boundary -> {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			try {
@@ -123,14 +139,52 @@ public class HttpEntityFactory {
 			} catch (IOException ignore) {
 				// The entity should be already cached at this point
 			}
-			ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
-
-			return Collections.<HttpPartFormatter>emptyList();
+			List<byte[]> parts = split(("--" + boundary).getBytes(Charset.defaultCharset()), baos.toByteArray(), -1);
+			if (Arrays.equals(parts.get(parts.size() - 1), new byte[] { '-', '-', '\r', '\n' })) {
+				parts = parts.subList(0, parts.size() - 1);
+			}
+			return parts.stream().skip(1).map(bytes -> Arrays.copyOfRange(bytes, 2, bytes.length - 2)).map(bytes -> {
+				List<byte[]> headerBody = split("\r\n\r\n".getBytes(Charset.defaultCharset()), bytes, 1);
+				List<Header> headers = split("\r\n".getBytes(Charset.defaultCharset()), headerBody.get(0), -1).stream()
+						.map(headerBytes -> new String(headerBytes, StandardCharsets.ISO_8859_1))
+						.map(HttpFormatUtils::toHeader)
+						.collect(Collectors.toList());
+				return Pair.of(headers, headerBody.get(1));
+			}).map(part -> {
+				String contentType = part.getKey()
+						.stream()
+						.filter(h -> HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(h.getName()))
+						.findAny()
+						.map(Header::getValue)
+						.orElse(null);
+				Charset charset = getCharset(contentType);
+				String mimeType = getMimeType(contentType);
+				BodyType bodyType = getBodyType(contentType, bodyTypeMap);
+				HttpPartFormatter.Builder partBuilder;
+				if (BodyType.TEXT == bodyType) {
+					partBuilder = new HttpPartFormatter.Builder(HttpPartFormatter.PartType.TEXT,
+							mimeType,
+							new String(part.getValue(), charset)
+					);
+				} else {
+					partBuilder = new HttpPartFormatter.Builder(HttpPartFormatter.PartType.BINARY,
+							mimeType,
+							part.getValue()
+					);
+				}
+				part.getKey().forEach(partBuilder::addHeader);
+				partBuilder.charset(charset.name());
+				partBuilder.headerConverter(partHeaderConverter);
+				return partBuilder.build();
+			}).collect(Collectors.toList());
 		}).orElse(Collections.emptyList());
 	}
 
 	@Nullable
-	private static HttpEntity cacheEntity(@Nonnull HttpEntity httpEntity) {
+	private static HttpEntity cacheEntity(@Nullable HttpEntity httpEntity) {
+		if (httpEntity == null) {
+			return null;
+		}
 		if (!httpEntity.isRepeatable()) {
 			try {
 				return new BufferedHttpEntity(httpEntity);
@@ -143,6 +197,18 @@ public class HttpEntityFactory {
 			}
 		}
 		return httpEntity;
+	}
+
+	@Nonnull
+	private static HttpResponse cacheEntity(@Nonnull HttpResponse response) {
+		response.setEntity(cacheEntity(response.getEntity()));
+		return response;
+	}
+
+	@Nonnull
+	private static HttpEntityEnclosingRequest cacheEntity(@Nonnull HttpEntityEnclosingRequest request) {
+		request.setEntity(cacheEntity(request.getEntity()));
+		return request;
 	}
 
 	@Nonnull
@@ -171,7 +237,7 @@ public class HttpEntityFactory {
 			return builder.build();
 		}
 
-		HttpEntity httpEntity = cacheEntity(((HttpEntityEnclosingRequest) request).getEntity());
+		HttpEntity httpEntity = cacheEntity(((HttpEntityEnclosingRequest) request)).getEntity();
 		if (httpEntity == null) {
 			return builder.build();
 		}
@@ -187,7 +253,7 @@ public class HttpEntityFactory {
 				builder.bodyParams(toParams(httpEntity));
 				break;
 			case MULTIPART:
-				toParts(httpEntity).forEach(builder::addBodyPart);
+				toParts(httpEntity, bodyTypeMap, partHeaderConverter).forEach(builder::addBodyPart);
 				break;
 			default:
 				builder.bodyBytes(type, toBytes(httpEntity));
@@ -215,7 +281,7 @@ public class HttpEntityFactory {
 				.forEach(h -> builder.addCookie(toCookie(h.getValue()))));
 		builder.headerConverter(headerConverter).cookieConverter(cookieConverter).prettiers(contentPrettiers);
 
-		HttpEntity httpEntity = cacheEntity(response.getEntity());
+		HttpEntity httpEntity = cacheEntity(response).getEntity();
 		if (httpEntity == null) {
 			return builder.build();
 		}
