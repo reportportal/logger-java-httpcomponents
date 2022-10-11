@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [5.0.0]
 ### Added
 - Initial release of Apache HttpComponents logger, by @HardNorth
 
