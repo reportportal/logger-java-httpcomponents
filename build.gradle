@@ -34,18 +34,18 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenCentral()
-    maven { url "https://jitpack.io" }
 }
 
 dependencies {
-    api 'com.epam.reportportal:client-java:5.1.16'
+    api 'com.epam.reportportal:client-java:5.1.22'
     api 'com.google.code.findbugs:jsr305:3.0.2'
     api 'com.epam.reportportal:commons-model:5.0.0'
     api 'com.squareup.okhttp3:okhttp:4.10.0'
-    api 'com.epam.reportportal:utils-java-formatting:5.1.5'
-    implementation 'org.apache.httpcomponents:httpcore:4.4.15'
+    api 'com.epam.reportportal:utils-java-formatting:5.1.6'
+    implementation 'org.apache.httpcomponents:httpcore:4.4.16'
 
-    testImplementation('com.github.reportportal:agent-java-test-utils:236a68c')
+    testImplementation 'com.epam.reportportal:agent-java-test-utils:0.0.2'
+
     testImplementation("org.junit.platform:junit-platform-runner:${junit5_runner_version}") {
         exclude module: 'junit'
     }
@@ -54,8 +54,8 @@ dependencies {
     testImplementation 'org.hamcrest:hamcrest-core:2.2'
     testImplementation "org.mockito:mockito-core:${mockito_version}"
     testImplementation "org.mockito:mockito-inline:${mockito_version}"
-    testImplementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    testImplementation 'org.apache.httpcomponents:httpmime:4.5.13'
+    testImplementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    testImplementation 'org.apache.httpcomponents:httpmime:4.5.14'
 }
 
 test {
