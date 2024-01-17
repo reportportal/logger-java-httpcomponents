@@ -40,7 +40,6 @@ import org.apache.http.message.BasicHttpResponse;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -50,6 +49,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -60,9 +60,8 @@ import java.util.function.Function;
 import static com.epam.reportportal.formatting.http.Constants.*;
 import static java.util.Optional.ofNullable;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
+import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -89,8 +88,8 @@ public class ReportPortalHttpLoggingInterceptorTest {
 	}
 
 	public static Iterable<Object[]> requestData() {
-		return Arrays.asList(new Object[] { JSON_TYPE, "{\"object\": {\"key\": \"value\"}}",
-						"{\"object\": {\"key\": \"value\"}}", JsonPrettier.INSTANCE, null, null },
+		return Arrays.asList(new Object[] { JSON_TYPE, "{\"object\": {\"key\": \"value\"}}", "{\"object\": {\"key\": \"value\"}}",
+						JsonPrettier.INSTANCE, null, null },
 				new Object[] { "application/xml", "<test><key><value>value</value></key></test>",
 						"<test><key><value>value</value></key></test>", XmlPrettier.INSTANCE, null, null }
 		);
@@ -113,8 +112,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		ArgumentCaptor<String> logCapture = ArgumentCaptor.forClass(String.class);
 		runChain(request,
 				response,
-				mock -> mock.when(() -> ReportPortal.emitLog(logCapture.capture(), anyString(), any(Date.class)))
-						.thenReturn(Boolean.TRUE)
+				mock -> mock.when(() -> ReportPortal.emitLog(logCapture.capture(), anyString(), any(Date.class))).thenReturn(Boolean.TRUE)
 		);
 		return logCapture.getAllValues();
 	}
@@ -123,14 +121,13 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		ArgumentCaptor<ReportPortalMessage> logCapture = ArgumentCaptor.forClass(ReportPortalMessage.class);
 		runChain(request,
 				response,
-				mock -> mock.when(() -> ReportPortal.emitLog(logCapture.capture(), anyString(), any(Date.class)))
-						.thenReturn(Boolean.TRUE)
+				mock -> mock.when(() -> ReportPortal.emitLog(logCapture.capture(), anyString(), any(Date.class))).thenReturn(Boolean.TRUE)
 		);
 		return logCapture.getAllValues();
 	}
 
-	private Triple<List<String>, List<String>, List<ReportPortalMessage>> runChainComplexMessageCapture(
-			HttpRequest request, HttpResponse response, ReportPortalHttpLoggingInterceptor interceptor) {
+	private Triple<List<String>, List<String>, List<ReportPortalMessage>> runChainComplexMessageCapture(HttpRequest request,
+			HttpResponse response, ReportPortalHttpLoggingInterceptor interceptor) {
 		ArgumentCaptor<String> stepCaptor = ArgumentCaptor.forClass(String.class);
 		ArgumentCaptor<String> stringArgumentCaptor = ArgumentCaptor.forClass(String.class);
 		ArgumentCaptor<ReportPortalMessage> messageArgumentCaptor = ArgumentCaptor.forClass(ReportPortalMessage.class);
@@ -147,20 +144,16 @@ public class ReportPortalHttpLoggingInterceptorTest {
 						.thenReturn(Boolean.TRUE);
 			}, interceptor);
 		}
-		return Triple.of(stepCaptor.getAllValues(),
-				stringArgumentCaptor.getAllValues(),
-				messageArgumentCaptor.getAllValues()
-		);
+		return Triple.of(stepCaptor.getAllValues(), stringArgumentCaptor.getAllValues(), messageArgumentCaptor.getAllValues());
 	}
 
 	@SuppressWarnings("SameParameterValue")
-	private Triple<List<String>, List<String>, List<ReportPortalMessage>> runChainComplexMessageCapture(
-			HttpRequest request, HttpResponse response) {
+	private Triple<List<String>, List<String>, List<ReportPortalMessage>> runChainComplexMessageCapture(HttpRequest request,
+			HttpResponse response) {
 		return runChainComplexMessageCapture(request, response, new ReportPortalHttpLoggingInterceptor(LogLevel.INFO));
 	}
 
-	private static HttpRequest mockBasicRequest(@Nonnull Collection<Pair<String, String>> headers,
-			@Nullable HttpEntity body) {
+	private static HttpRequest mockBasicRequest(@Nonnull Collection<Pair<String, String>> headers, @Nullable HttpEntity body) {
 		HttpPost request = new HttpPost(URI);
 		headers.forEach(h -> request.addHeader(h.getKey(), h.getValue()));
 		if (body != null) {
@@ -177,8 +170,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		return mockBasicRequest(Collections.emptyList());
 	}
 
-	private static HttpResponse createBasicResponse(@Nonnull Collection<Pair<String, String>> headers,
-			@Nullable HttpEntity body) {
+	private static HttpResponse createBasicResponse(@Nonnull Collection<Pair<String, String>> headers, @Nullable HttpEntity body) {
 		StatusLine statusLine = mock(StatusLine.class);
 		when(statusLine.getStatusCode()).thenReturn(STATUS_CODE);
 		when(statusLine.getReasonPhrase()).thenReturn("Created");
@@ -215,17 +207,12 @@ public class ReportPortalHttpLoggingInterceptorTest {
 
 	@ParameterizedTest
 	@MethodSource("requestData")
-	public void test_logger_text_body(String mimeType, String requestBodyStr, String responseBodyStr,
-			Function<String, String> prettier) {
+	public void test_logger_text_body(String mimeType, String requestBodyStr, String responseBodyStr, Function<String, String> prettier) {
 		Charset charset = StandardCharsets.UTF_8;
-		HttpEntity requestBody = new ByteArrayEntity(requestBodyStr.getBytes(charset),
-				ContentType.create(mimeType, charset)
-		);
+		HttpEntity requestBody = new ByteArrayEntity(requestBodyStr.getBytes(charset), ContentType.create(mimeType, charset));
 		HttpRequest request = mockBasicRequest(Collections.emptyList(), requestBody);
 
-		HttpEntity responseBody = new ByteArrayEntity(requestBodyStr.getBytes(charset),
-				ContentType.create(mimeType, charset)
-		);
+		HttpEntity responseBody = new ByteArrayEntity(requestBodyStr.getBytes(charset), ContentType.create(mimeType, charset));
 		HttpResponse response = createBasicResponse(Collections.emptyList(), responseBody);
 
 		List<String> logs = runChainTextMessageCapture(request, response);
@@ -280,8 +267,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		assertThat(logs, hasSize(2)); // Request + Response
 
 		String requestHeaderString = "\n\n**Cookies**\n" + "test: value";
-		String responseHeaderString =
-				"\n\n**Cookies**\n" + "test: value; Path=/; Secure=true; HttpOnly=true; Expires=" + expiryDate;
+		String responseHeaderString = "\n\n**Cookies**\n" + "test: value; Path=/; Secure=true; HttpOnly=true; Expires=" + expiryDate;
 
 		assertThat(logs.get(0), equalTo(EMPTY_REQUEST + requestHeaderString));
 		assertThat(logs.get(1), equalTo(EMPTY_RESPONSE + responseHeaderString));
@@ -297,12 +283,8 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		String expiryDate1 = "Tue, 06 Sep 2022 09:32:51 UTC";
 		String expiryDate2 = "Tue, 06 Sep 2022 09:32:51 UTC";
 		Collection<Pair<String, String>> responseHeaders = Arrays.asList(Pair.of(HTTP_HEADER, HTTP_HEADER_VALUE),
-				Pair.of("Set-cookie",
-						"test=value; comment=test comment; expires=" + expiryDate1 + "; path=/; version=1"
-				),
-				Pair.of("Set-cookie",
-						"tz=Europe%2FMinsk; path=/; expires=" + expiryDate2 + "; secure; HttpOnly; SameSite=Lax"
-				)
+				Pair.of("Set-cookie", "test=value; comment=test comment; expires=" + expiryDate1 + "; path=/; version=1"),
+				Pair.of("Set-cookie", "tz=Europe%2FMinsk; path=/; expires=" + expiryDate2 + "; secure; HttpOnly; SameSite=Lax")
 		);
 		HttpRequest request = mockBasicRequest(headers);
 		HttpResponse response = createBasicResponse(responseHeaders);
@@ -313,8 +295,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		assertThat(logs, hasSize(2)); // Request + Response
 
 		String requestHeaderString =
-				"\n\n**Headers**\n" + HTTP_HEADER + ": " + HTTP_HEADER_VALUE + "\n\n**Cookies**\n" + "test: value\n"
-						+ "tz: Europe/Minsk";
+				"\n\n**Headers**\n" + HTTP_HEADER + ": " + HTTP_HEADER_VALUE + "\n\n**Cookies**\n" + "test: value\n" + "tz: Europe/Minsk";
 
 		String responseHeaderString = "\n\n**Headers**\n" + HTTP_HEADER + ": " + HTTP_HEADER_VALUE + "\n\n**Cookies**\n"
 				+ "test: value; Comment=test comment; Path=/; Expires=" + expiryDate1 + "; Version=1\n"
@@ -419,9 +400,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		HttpEntity body = getBinaryBody(imageType, IMAGE);
 		HttpRequest request = mockBasicRequest(Collections.emptyList(), body);
 
-		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(request,
-				createBasicResponse()
-		);
+		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(request, createBasicResponse());
 		assertThat(logs.getLeft(), hasSize(1));
 		assertThat(logs.getMiddle(), hasSize(1));
 		assertThat(logs.getRight(), hasSize(1));
@@ -429,9 +408,8 @@ public class ReportPortalHttpLoggingInterceptorTest {
 		assertThat(logs.getLeft().get(0), equalTo(EMPTY_REQUEST));
 		assertThat(logs.getMiddle().get(0), equalTo(EMPTY_RESPONSE));
 		assertThat(logs.getRight().get(0).getMessage(),
-				equalTo(HEADERS_TAG + LINE_DELIMITER
-						+ "Content-Disposition: form-data; name=\"file\"; filename=\"pug/lucky.jpg\"" + LINE_DELIMITER
-						+ "Content-Type: image/jpeg" + LINE_DELIMITER + "Content-Transfer-Encoding: binary"
+				equalTo(HEADERS_TAG + LINE_DELIMITER + "Content-Disposition: form-data; name=\"file\"; filename=\"pug/lucky.jpg\""
+						+ LINE_DELIMITER + "Content-Type: image/jpeg" + LINE_DELIMITER + "Content-Transfer-Encoding: binary"
 						+ LINE_DELIMITER + LINE_DELIMITER + BODY_PART_TAG + LINE_DELIMITER + imageType.getMimeType())
 		);
 		assertThat(logs.getRight().get(0).getData().getMediaType(), equalTo(imageType.getMimeType()));
@@ -440,10 +418,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 
 	@SuppressWarnings("SameParameterValue")
 	private HttpEntity getBinaryTextBody(ContentType textType, String text, ContentType binaryType, String filePath) {
-		FormBodyPart textPart = FormBodyPartBuilder.create()
-				.setName("text")
-				.setBody(new StringBody(text, textType))
-				.build();
+		FormBodyPart textPart = FormBodyPartBuilder.create().setName("text").setBody(new StringBody(text, textType)).build();
 		FormBodyPart binaryPart = getBinaryPart(binaryType, filePath);
 
 		return MultipartEntityBuilder.create().addPart(binaryPart).addPart(textPart).build();
@@ -469,16 +444,14 @@ public class ReportPortalHttpLoggingInterceptorTest {
 
 		assertThat(logs.getMiddle().get(0),
 				equalTo(HEADERS_TAG + LINE_DELIMITER + "Content-Disposition: form-data; name=\"text\"" + LINE_DELIMITER
-						+ "Content-Type: text/plain; charset=ISO-8859-1" + LINE_DELIMITER
-						+ "Content-Transfer-Encoding: 8bit" + LINE_DELIMITER + LINE_DELIMITER + BODY_PART_TAG
-						+ "\n```\n" + message + "\n```")
+						+ "Content-Type: text/plain; charset=ISO-8859-1" + LINE_DELIMITER + "Content-Transfer-Encoding: 8bit"
+						+ LINE_DELIMITER + LINE_DELIMITER + BODY_PART_TAG + "\n```\n" + message + "\n```")
 		);
 		assertThat(logs.getMiddle().get(1), equalTo(EMPTY_RESPONSE));
 
 		assertThat(logs.getRight().get(0).getMessage(),
-				equalTo(HEADERS_TAG + LINE_DELIMITER
-						+ "Content-Disposition: form-data; name=\"file\"; filename=\"pug/lucky.jpg\"" + LINE_DELIMITER
-						+ "Content-Type: image/jpeg" + LINE_DELIMITER + "Content-Transfer-Encoding: binary"
+				equalTo(HEADERS_TAG + LINE_DELIMITER + "Content-Disposition: form-data; name=\"file\"; filename=\"pug/lucky.jpg\""
+						+ LINE_DELIMITER + "Content-Type: image/jpeg" + LINE_DELIMITER + "Content-Transfer-Encoding: binary"
 						+ LINE_DELIMITER + LINE_DELIMITER + BODY_PART_TAG + LINE_DELIMITER + imageType.getMimeType())
 		);
 		assertThat(logs.getRight().get(0).getData().getMediaType(), equalTo(imageType.getMimeType()));
@@ -486,8 +459,8 @@ public class ReportPortalHttpLoggingInterceptorTest {
 	}
 
 	public static Iterable<Object[]> invalidContentTypes() {
-		return Arrays.asList(new Object[] { "", ContentType.APPLICATION_OCTET_STREAM.getMimeType(),
-						ContentType.APPLICATION_OCTET_STREAM.getMimeType() },
+		return Arrays.asList(
+				new Object[] { "", ContentType.APPLICATION_OCTET_STREAM.getMimeType(), ContentType.APPLICATION_OCTET_STREAM.getMimeType() },
 				new Object[] { "*/*", ContentType.APPLICATION_OCTET_STREAM.getMimeType(),
 						ContentType.APPLICATION_OCTET_STREAM.getMimeType() },
 				new Object[] { "something invalid", ContentType.APPLICATION_OCTET_STREAM.getMimeType(),
@@ -503,8 +476,8 @@ public class ReportPortalHttpLoggingInterceptorTest {
 
 	@ParameterizedTest
 	@MethodSource("invalidContentTypes")
-	public void test_logger_invalid_content_type(String mimeType, String expectedRequestType,
-			String expectedResponseType) throws IOException {
+	public void test_logger_invalid_content_type(String mimeType, String expectedRequestType, String expectedResponseType)
+			throws IOException {
 		byte[] image = getResource(IMAGE);
 
 		HttpRequest request = mockBasicRequest(Collections.singletonList(Pair.of(HttpHeaders.CONTENT_TYPE, mimeType)),
@@ -514,18 +487,16 @@ public class ReportPortalHttpLoggingInterceptorTest {
 				new ByteArrayEntity(image)
 		);
 
-		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(request,
-				response
-		);
+		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(request, response);
 		String escapedMimeType = mimeType.replace("*", "\\*");
 		assertThat(logs.getRight(), hasSize(2)); // Request + Response
 		assertThat(logs.getRight().get(0).getMessage(),
-				equalTo(EMPTY_REQUEST + LINE_DELIMITER + LINE_DELIMITER + HEADERS_TAG + LINE_DELIMITER
-						+ HttpHeaders.CONTENT_TYPE + ": " + escapedMimeType)
+				equalTo(EMPTY_REQUEST + LINE_DELIMITER + LINE_DELIMITER + HEADERS_TAG + LINE_DELIMITER + HttpHeaders.CONTENT_TYPE + ": "
+						+ escapedMimeType)
 		);
 		assertThat(logs.getRight().get(1).getMessage(),
-				equalTo(EMPTY_RESPONSE + LINE_DELIMITER + LINE_DELIMITER + HEADERS_TAG + LINE_DELIMITER
-						+ HttpHeaders.CONTENT_TYPE + ": " + escapedMimeType)
+				equalTo(EMPTY_RESPONSE + LINE_DELIMITER + LINE_DELIMITER + HEADERS_TAG + LINE_DELIMITER + HttpHeaders.CONTENT_TYPE + ": "
+						+ escapedMimeType)
 		);
 
 		assertThat(logs.getRight().get(0).getData().getMediaType(), equalTo(expectedRequestType));
@@ -539,8 +510,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 	public void test_request_log_filter_type() {
 		HttpRequest requestSpecification = mockBasicRequest();
 		HttpResponse responseObject = createBasicResponse();
-		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(
-				requestSpecification,
+		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(requestSpecification,
 				responseObject,
 				new ReportPortalHttpLoggingInterceptor(LogLevel.INFO).addRequestFilter(r -> true)
 		);
@@ -552,8 +522,7 @@ public class ReportPortalHttpLoggingInterceptorTest {
 	public void test_response_log_filter_type() {
 		HttpRequest requestSpecification = mockBasicRequest();
 		HttpResponse responseObject = createBasicResponse();
-		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(
-				requestSpecification,
+		Triple<List<String>, List<String>, List<ReportPortalMessage>> logs = runChainComplexMessageCapture(requestSpecification,
 				responseObject,
 				new ReportPortalHttpLoggingInterceptor(LogLevel.INFO).addResponseFilter(r -> true)
 		);
