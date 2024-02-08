@@ -37,9 +37,9 @@ repositories {
 }
 
 dependencies {
+    api 'com.epam.reportportal:utils-java-formatting:5.2.1'
     implementation 'com.epam.reportportal:client-java:5.2.4'
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
-    implementation 'com.epam.reportportal:utils-java-formatting:5.2.1'
     implementation 'org.apache.httpcomponents:httpcore:4.4.16'
 
     testImplementation 'com.epam.reportportal:agent-java-test-utils:0.0.2'
