@@ -1,8 +1,15 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Client version updated on [5.2.4](https://github.com/reportportal/client-java/releases/tag/5.2.4), by @HardNorth
+- `utils-java-formatting` library version updated on version [5.2.1](https://github.com/reportportal/utils-java-formatting/releases/tag/5.2.1), by @HardNorth
+- All dependencies are marked as `implementation`, by @HardNorth
+### Removed
+- `commons-model` dependency to rely on `clinet-java` exclusions in security fixes, by @HardNorth
 
 ## [5.1.0]
+### Changed
 - Client version updated on [5.2.0](https://github.com/reportportal/client-java/releases/tag/5.2.0), by @HardNorth
 - `utils-java-formatting` library version updated on version [5.2.0](https://github.com/reportportal/utils-java-formatting/releases/tag/5.2.0), by @HardNorth
 
