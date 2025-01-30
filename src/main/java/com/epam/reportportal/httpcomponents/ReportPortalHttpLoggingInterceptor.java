@@ -18,11 +18,12 @@ package com.epam.reportportal.httpcomponents;
 
 import com.epam.reportportal.formatting.AbstractHttpFormatter;
 import com.epam.reportportal.formatting.http.converters.DefaultCookieConverter;
+import com.epam.reportportal.formatting.http.converters.DefaultFormParamConverter;
 import com.epam.reportportal.formatting.http.converters.DefaultHttpHeaderConverter;
 import com.epam.reportportal.formatting.http.converters.DefaultUriConverter;
-import com.epam.reportportal.formatting.http.entities.BodyType;
 import com.epam.reportportal.formatting.http.entities.Cookie;
 import com.epam.reportportal.formatting.http.entities.Header;
+import com.epam.reportportal.formatting.http.entities.Param;
 import com.epam.reportportal.httpcomponents.support.HttpEntityFactory;
 import com.epam.reportportal.listeners.LogLevel;
 import org.apache.http.HttpRequest;
@@ -33,10 +34,7 @@ import org.apache.http.protocol.HttpContext;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -46,6 +44,8 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 
 	private final List<Predicate<HttpRequest>> requestFilters = new CopyOnWriteArrayList<>();
 	private final List<Predicate<HttpResponse>> responseFilters = new CopyOnWriteArrayList<>();
+
+	protected final Function<Param, String> paramConverter;
 
 	/**
 	 * Create a Logging Interceptor with the specific log level and converters.
@@ -61,16 +61,37 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 	 * @param uriConverterFunction      the same as 'headerConvertFunction' param but for URI, default function returns
 	 *                                  URI "as is"
 	 */
-	protected ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel,
-			@Nullable Function<Header, String> headerConvertFunction,
-			@Nullable Function<Header, String> partHeaderConvertFunction,
-			@Nullable Function<Cookie, String> cookieConvertFunction,
+	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel, @Nullable Function<Header, String> headerConvertFunction,
+			@Nullable Function<Header, String> partHeaderConvertFunction, @Nullable Function<Cookie, String> cookieConvertFunction,
+			@Nullable Function<String, String> uriConverterFunction, @Nullable Function<Param, String> paramConverter) {
+		super(defaultLogLevel, headerConvertFunction, partHeaderConvertFunction, cookieConvertFunction, uriConverterFunction);
+		this.paramConverter = paramConverter != null ? paramConverter : DefaultFormParamConverter.INSTANCE;
+	}
+
+	/**
+	 * Create a Logging Interceptor with the specific log level and converters.
+	 *
+	 * @param defaultLogLevel           log level on which Apache HttpComponents requests/responses will appear on
+	 *                                  Report Portal
+	 * @param headerConvertFunction     if you want to preprocess your HTTP Headers before they appear on Report Portal
+	 *                                  provide this custom function for the class, default function formats it like
+	 *                                  that: <code>header.getName() + ": " + header.getValue()</code>
+	 * @param partHeaderConvertFunction the same as for HTTP Headers, but for parts in Multipart request
+	 * @param cookieConvertFunction     the same as 'headerConvertFunction' param but for Cookies, default function
+	 *                                  formats Cookies with <code>toString</code> method
+	 * @param uriConverterFunction      the same as 'headerConvertFunction' param but for URI, default function returns
+	 *                                  URI "as is"
+	 */
+	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel, @Nullable Function<Header, String> headerConvertFunction,
+			@Nullable Function<Header, String> partHeaderConvertFunction, @Nullable Function<Cookie, String> cookieConvertFunction,
 			@Nullable Function<String, String> uriConverterFunction) {
-		super(defaultLogLevel,
+		this(
+				defaultLogLevel,
 				headerConvertFunction,
 				partHeaderConvertFunction,
 				cookieConvertFunction,
-				uriConverterFunction
+				uriConverterFunction,
+				DefaultFormParamConverter.INSTANCE
 		);
 	}
 
@@ -86,16 +107,9 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 	 * @param cookieConvertFunction     the same as 'headerConvertFunction' param but for Cookies, default function
 	 *                                  formats Cookies with <code>toString</code> method
 	 */
-	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel,
-			@Nullable Function<Header, String> headerConvertFunction,
-			@Nullable Function<Header, String> partHeaderConvertFunction,
-			@Nullable Function<Cookie, String> cookieConvertFunction) {
-		this(defaultLogLevel,
-				headerConvertFunction,
-				partHeaderConvertFunction,
-				cookieConvertFunction,
-				DefaultUriConverter.INSTANCE
-		);
+	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel, @Nullable Function<Header, String> headerConvertFunction,
+			@Nullable Function<Header, String> partHeaderConvertFunction, @Nullable Function<Cookie, String> cookieConvertFunction) {
+		this(defaultLogLevel, headerConvertFunction, partHeaderConvertFunction, cookieConvertFunction, DefaultUriConverter.INSTANCE);
 	}
 
 	/**
@@ -108,8 +122,7 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 	 *                                  that: <code>header.getName() + ": " + header.getValue()</code>
 	 * @param partHeaderConvertFunction the same as for HTTP Headers, but for parts in Multipart request
 	 */
-	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel,
-			@Nullable Function<Header, String> headerConvertFunction,
+	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel, @Nullable Function<Header, String> headerConvertFunction,
 			@Nullable Function<Header, String> partHeaderConvertFunction) {
 		this(defaultLogLevel, headerConvertFunction, partHeaderConvertFunction, DefaultCookieConverter.INSTANCE);
 	}
@@ -128,14 +141,16 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 		if (requestFilters.stream().anyMatch(f -> f.test(request))) {
 			return;
 		}
-		emitLog(HttpEntityFactory.createHttpRequestFormatter(request,
+		emitLog(HttpEntityFactory.createHttpRequestFormatter(
+				request,
 				context,
 				uriConverter,
 				headerConverter,
 				cookieConverter,
-				contentPrettiers,
+				paramConverter,
+				getContentPrettifiers(),
 				partHeaderConverter,
-				bodyTypeMap
+				getBodyTypeMap()
 		));
 	}
 
@@ -144,24 +159,14 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 		if (responseFilters.stream().anyMatch(f -> f.test(response))) {
 			return;
 		}
-		emitLog(HttpEntityFactory.createHttpResponseFormatter(response,
+		emitLog(HttpEntityFactory.createHttpResponseFormatter(
+				response,
 				context,
 				headerConverter,
 				cookieConverter,
-				contentPrettiers,
-				bodyTypeMap
+				getContentPrettifiers(),
+				getBodyTypeMap()
 		));
-	}
-
-	public ReportPortalHttpLoggingInterceptor setBodyTypeMap(@Nonnull Map<String, BodyType> typeMap) {
-		this.bodyTypeMap = Collections.unmodifiableMap(new HashMap<>(typeMap));
-		return this;
-	}
-
-	public ReportPortalHttpLoggingInterceptor setContentPrettiers(
-			@Nonnull Map<String, Function<String, String>> contentPrettiers) {
-		this.contentPrettiers = Collections.unmodifiableMap(new HashMap<>(contentPrettiers));
-		return this;
 	}
 
 	public ReportPortalHttpLoggingInterceptor addRequestFilter(@Nonnull Predicate<HttpRequest> requestFilter) {

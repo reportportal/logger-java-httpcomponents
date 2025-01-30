@@ -47,14 +47,15 @@ public class HttpEntityFactory {
 
 	@Nonnull
 	private static Charset getCharset(@Nullable String contentTypeValue) {
-		return ofNullable(contentTypeValue).flatMap(h -> toKeyValue(h).filter(p -> "charset".equalsIgnoreCase(p.getKey()))
-				.findAny()).map(Pair::getValue).map(Charset::forName).orElse(StandardCharsets.UTF_8);
+		return ofNullable(contentTypeValue).flatMap(h -> toKeyValue(h).filter(p -> "charset".equalsIgnoreCase(p.getKey())).findAny())
+				.map(Pair::getValue)
+				.map(Charset::forName)
+				.orElse(StandardCharsets.UTF_8);
 	}
 
 	@Nonnull
 	private static Charset getCharset(@Nonnull HttpEntity httpEntity) {
-		return ofNullable(httpEntity.getContentType()).map(h -> getCharset(h.getValue()))
-				.orElse(StandardCharsets.UTF_8);
+		return ofNullable(httpEntity.getContentType()).map(h -> getCharset(h.getValue())).orElse(StandardCharsets.UTF_8);
 	}
 
 	@Nullable
@@ -64,7 +65,8 @@ public class HttpEntityFactory {
 			httpEntity.writeTo(baos);
 			return baos.toByteArray();
 		} catch (IOException e) {
-			ReportPortal.emitLog("Unable to read HTTP entity: " + ExceptionUtils.getStackTrace(e),
+			ReportPortal.emitLog(
+					"Unable to read HTTP entity: " + ExceptionUtils.getStackTrace(e),
 					LogLevel.WARN.name(),
 					Calendar.getInstance().getTime()
 			);
@@ -86,15 +88,13 @@ public class HttpEntityFactory {
 	@Nonnull
 	private static List<Param> toParams(@Nonnull HttpEntity httpEntity) {
 		String body = toString(httpEntity, StandardCharsets.ISO_8859_1);
-		return HttpFormatUtils.toForm(body,
-				ofNullable(httpEntity.getContentType()).map(NameValuePair::getValue).orElse(null)
-		);
+		return HttpFormatUtils.toForm(body, ofNullable(httpEntity.getContentType()).map(NameValuePair::getValue).orElse(null));
 	}
 
 	@Nullable
 	private static String getBoundary(@Nonnull HttpEntity httpEntity) {
-		return ofNullable(httpEntity.getContentType()).flatMap(h -> toKeyValue(h.getValue()).filter(p -> "boundary".equalsIgnoreCase(
-				p.getKey())).findAny()).map(Pair::getValue).orElse(null);
+		return ofNullable(httpEntity.getContentType()).flatMap(h -> toKeyValue(h.getValue()).filter(p -> "boundary".equalsIgnoreCase(p.getKey()))
+				.findAny()).map(Pair::getValue).orElse(null);
 	}
 
 	private static boolean isMatch(@Nonnull byte[] pattern, @Nonnull byte[] input, int pos) {
@@ -130,8 +130,8 @@ public class HttpEntityFactory {
 	}
 
 	@Nonnull
-	private static List<HttpPartFormatter> toParts(@Nonnull HttpEntity httpEntity,
-			@Nonnull Map<String, BodyType> bodyTypeMap, @Nullable Function<Header, String> partHeaderConverter) {
+	private static List<HttpPartFormatter> toParts(@Nonnull HttpEntity httpEntity, @Nonnull Map<String, BodyType> bodyTypeMap,
+			@Nullable Function<Header, String> partHeaderConverter) {
 		return ofNullable(getBoundary(httpEntity)).map(boundary -> {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			try {
@@ -162,15 +162,13 @@ public class HttpEntityFactory {
 				BodyType bodyType = getBodyType(contentType, bodyTypeMap);
 				HttpPartFormatter.Builder partBuilder;
 				if (BodyType.TEXT == bodyType) {
-					partBuilder = new HttpPartFormatter.Builder(HttpPartFormatter.PartType.TEXT,
+					partBuilder = new HttpPartFormatter.Builder(
+							HttpPartFormatter.PartType.TEXT,
 							mimeType,
 							new String(part.getValue(), charset)
 					);
 				} else {
-					partBuilder = new HttpPartFormatter.Builder(HttpPartFormatter.PartType.BINARY,
-							mimeType,
-							part.getValue()
-					);
+					partBuilder = new HttpPartFormatter.Builder(HttpPartFormatter.PartType.BINARY, mimeType, part.getValue());
 				}
 				part.getKey().forEach(partBuilder::addHeader);
 				partBuilder.charset(charset.name());
@@ -189,7 +187,8 @@ public class HttpEntityFactory {
 			try {
 				return new BufferedHttpEntity(httpEntity);
 			} catch (IOException e) {
-				ReportPortal.emitLog("Unable to read HTTP entity: " + ExceptionUtils.getStackTrace(e),
+				ReportPortal.emitLog(
+						"Unable to read HTTP entity: " + ExceptionUtils.getStackTrace(e),
 						LogLevel.WARN.name(),
 						Calendar.getInstance().getTime()
 				);
@@ -214,12 +213,12 @@ public class HttpEntityFactory {
 	@Nonnull
 	public static HttpFormatter createHttpRequestFormatter(@Nonnull HttpRequest request, @Nonnull HttpContext context,
 			@Nullable Function<String, String> uriConverter, @Nullable Function<Header, String> headerConverter,
-			@Nullable Function<Cookie, String> cookieConverter,
-			@Nullable Map<String, Function<String, String>> contentPrettiers,
-			@Nullable Function<Header, String> partHeaderConverter, @Nonnull Map<String, BodyType> bodyTypeMap) {
-		HttpRequestFormatter.Builder builder = new HttpRequestFormatter.Builder(request.getRequestLine().getMethod(),
-				ofNullable(context.getAttribute(HttpCoreContext.HTTP_TARGET_HOST)).orElse("") + request.getRequestLine()
-						.getUri()
+			@Nullable Function<Cookie, String> cookieConverter, @Nullable Function<Param, String> paramConverter,
+			@Nullable Map<String, Function<String, String>> contentPrettifiers, @Nullable Function<Header, String> partHeaderConverter,
+			@Nonnull Map<String, BodyType> bodyTypeMap) {
+		HttpRequestFormatter.Builder builder = new HttpRequestFormatter.Builder(
+				request.getRequestLine().getMethod(),
+				ofNullable(context.getAttribute(HttpCoreContext.HTTP_TARGET_HOST)).orElse("") + request.getRequestLine().getUri()
 		);
 		ofNullable(request.getAllHeaders()).ifPresent(headers -> Arrays.stream(headers)
 				.filter(h -> !isCookie(h.getName()))
@@ -231,7 +230,8 @@ public class HttpEntityFactory {
 		builder.uriConverter(uriConverter)
 				.headerConverter(headerConverter)
 				.cookieConverter(cookieConverter)
-				.prettiers(contentPrettiers);
+				.paramConverter(paramConverter)
+				.prettifiers(contentPrettifiers);
 
 		if (!(request instanceof HttpEntityEnclosingRequest)) {
 			return builder.build();
@@ -263,15 +263,13 @@ public class HttpEntityFactory {
 
 	@Nonnull
 	@SuppressWarnings("unused")
-	public static HttpFormatter createHttpResponseFormatter(@Nonnull HttpResponse response,
-			@Nonnull HttpContext context, @Nullable Function<Header, String> headerConverter,
-			@Nullable Function<Cookie, String> cookieConverter,
-			@Nullable Map<String, Function<String, String>> contentPrettiers,
-			@Nonnull Map<String, BodyType> bodyTypeMap) {
+	public static HttpFormatter createHttpResponseFormatter(@Nonnull HttpResponse response, @Nonnull HttpContext context,
+			@Nullable Function<Header, String> headerConverter, @Nullable Function<Cookie, String> cookieConverter,
+			@Nullable Map<String, Function<String, String>> contentPrettifiers, @Nonnull Map<String, BodyType> bodyTypeMap) {
 		StatusLine statusLine = response.getStatusLine();
-		HttpResponseFormatter.Builder builder = new HttpResponseFormatter.Builder(statusLine.getStatusCode(),
-				statusLine.getProtocolVersion().toString() + " " + statusLine.getStatusCode() + " "
-						+ statusLine.getReasonPhrase()
+		HttpResponseFormatter.Builder builder = new HttpResponseFormatter.Builder(
+				statusLine.getStatusCode(),
+				statusLine.getProtocolVersion().toString() + " " + statusLine.getStatusCode() + " " + statusLine.getReasonPhrase()
 		);
 		ofNullable(response.getAllHeaders()).ifPresent(headers -> Arrays.stream(headers)
 				.filter(h -> !isSetCookie(h.getName()))
@@ -279,7 +277,7 @@ public class HttpEntityFactory {
 		ofNullable(response.getAllHeaders()).ifPresent(headers -> Arrays.stream(headers)
 				.filter(h -> isSetCookie(h.getName()))
 				.forEach(h -> builder.addCookie(toCookie(h.getValue()))));
-		builder.headerConverter(headerConverter).cookieConverter(cookieConverter).prettiers(contentPrettiers);
+		builder.headerConverter(headerConverter).cookieConverter(cookieConverter).prettifiers(contentPrettifiers);
 
 		HttpEntity httpEntity = cacheEntity(response).getEntity();
 		if (httpEntity == null) {

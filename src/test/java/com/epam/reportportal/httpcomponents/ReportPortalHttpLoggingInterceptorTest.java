@@ -16,8 +16,8 @@
 
 package com.epam.reportportal.httpcomponents;
 
-import com.epam.reportportal.formatting.http.prettiers.JsonPrettier;
-import com.epam.reportportal.formatting.http.prettiers.XmlPrettier;
+import com.epam.reportportal.formatting.http.prettifiers.JsonPrettifier;
+import com.epam.reportportal.formatting.http.prettifiers.XmlPrettifier;
 import com.epam.reportportal.listeners.ItemStatus;
 import com.epam.reportportal.listeners.LogLevel;
 import com.epam.reportportal.message.ReportPortalMessage;
@@ -90,9 +90,9 @@ public class ReportPortalHttpLoggingInterceptorTest {
 
 	public static Iterable<Object[]> requestData() {
 		return Arrays.asList(new Object[] { JSON_TYPE, "{\"object\": {\"key\": \"value\"}}", "{\"object\": {\"key\": \"value\"}}",
-						JsonPrettier.INSTANCE, null, null },
+						JsonPrettifier.INSTANCE, null, null },
 				new Object[] { "application/xml", "<test><key><value>value</value></key></test>",
-						"<test><key><value>value</value></key></test>", XmlPrettier.INSTANCE, null, null }
+						"<test><key><value>value</value></key></test>", XmlPrettifier.INSTANCE, null, null }
 		);
 	}
 
