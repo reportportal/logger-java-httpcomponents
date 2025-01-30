@@ -1,6 +1,12 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- A constructor in `ReportPortalHttpLoggingInterceptor` class which accepts `paramConverter` parameter, by @HardNorth
+### Changed
+- `utils-java-formatting` dependency version updated on [5.2.7](https://github.com/reportportal/utils-java-formatting/releases/tag/5.2.7), by @HardNorth
+### Removed
+- `setBodyTypeMap` and `setContentPrettiers` methods from `ReportPortalHttpLoggingInterceptor` class, since they duplicate those from `AbstractHttpFormatter` class, by @HardNorth
 
 ## [5.1.5]
 ### Changed
