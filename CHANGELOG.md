@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [5.1.6]
 ### Added
 - A constructor in `ReportPortalHttpLoggingInterceptor` class which accepts `paramConverter` parameter, by @HardNorth
 ### Changed
