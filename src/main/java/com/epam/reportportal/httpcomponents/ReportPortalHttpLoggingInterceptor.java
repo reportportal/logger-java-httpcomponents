@@ -60,6 +60,8 @@ public class ReportPortalHttpLoggingInterceptor extends AbstractHttpFormatter<Re
 	 *                                  formats Cookies with <code>toString</code> method
 	 * @param uriConverterFunction      the same as 'headerConvertFunction' param but for URI, default function returns
 	 *                                  URI "as is"
+	 * @param paramConverter            the same as 'headerConvertFunction' param but for Web Form Params, default function returns
+	 *                                  <code>param.getName() + ": " + param.getValue()</code>
 	 */
 	public ReportPortalHttpLoggingInterceptor(@Nonnull LogLevel defaultLogLevel, @Nullable Function<Header, String> headerConvertFunction,
 			@Nullable Function<Header, String> partHeaderConvertFunction, @Nullable Function<Cookie, String> cookieConvertFunction,
