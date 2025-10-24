@@ -40,7 +40,7 @@ dependencies {
     api 'com.epam.reportportal:utils-java-formatting:5.4.0'
     compileOnly "com.epam.reportportal:client-java:${client_version}"
     implementation 'org.apache.httpcomponents:httpcore:4.4.16'
-    implementation 'org.apache.commons:commons-lang3:3.18.0'
+    implementation 'org.apache.commons:commons-lang3:3.19.0'
 
     testImplementation "com.epam.reportportal:client-java:${client_version}"
     testImplementation 'com.epam.reportportal:agent-java-test-utils:0.1.0'
